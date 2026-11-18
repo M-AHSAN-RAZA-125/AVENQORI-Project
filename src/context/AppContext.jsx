@@ -1,84 +1,65 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-import { INITIAL_TEACHERS } from '../data/teachers';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 const AppContext = createContext(null);
 
-export function AppProvider({ children }) {
-  const [view, setView] = useState('role');
-  const [role, setRole] = useState(null);
-  const [me, setMe] = useState(null);         // logged-in teacher profile
-  const [query, setQuery] = useState(null);    // student search query
-  const [requests, setRequests] = useState([]); // all tutor requests
-  const [teachers, setTeachers] = useState(INITIAL_TEACHERS);
-  const [toast, setToast] = useState({ msg: '', visible: false });
-  const [modalTeacher, setModalTeacher] = useState(null);
-  const [theme, setTheme] = useState('system'); // 'light' | 'dark' | 'system'
+export const PAGES = {
+  // Public
+  landing: 'landing',
+  login:   'login',
+  signup:  'signup',
+  // Student portal
+  dashboard:   'dashboard',
+  myCourses:   'myCourses',
+  findTutor:   'findTutor',
+  liveClasses: 'liveClasses',
+  aiPlanner:   'aiPlanner',
+  bookings:    'bookings',
+  certificates:'certificates',
+  progress:    'progress',
+  messages:    'messages',
+  notifications:'notifications',
+  settings:    'settings',
+  help:        'help',
+};
 
-  const showToast = useCallback((msg) => {
-    setToast({ msg, visible: true });
-    setTimeout(() => setToast(t => ({ ...t, visible: false })), 2200);
+const MOCK_USER = {
+  name: 'Ahmed Raza',
+  role: 'Student',
+  email: 'ahmedraza@gmail.com',
+  plan: 'Premium Plan',
+  country: 'Pakistan',
+  memberSince: 'Nov 14, 2025',
+};
+
+export function AppProvider({ children }) {
+  const [page, setPage] = useState(PAGES.landing);
+  const [user, setUser] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const toastId = useRef(0);
+
+  const navigate = useCallback((p) => { setPage(p); window.scrollTo(0, 0); }, []);
+
+  const login = useCallback((role = 'student') => {
+    setUser({ ...MOCK_USER, role });
+    setPage(PAGES.dashboard);
   }, []);
 
-  const go = useCallback((v) => setView(v), []);
+  const logout = useCallback(() => {
+    setUser(null);
+    setPage(PAGES.landing);
+  }, []);
 
-  const pickRole = useCallback((r) => {
-    setRole(r);
-    if (r === 'teacher') {
-      setView(me ? 'tDash' : 'tSetup');
-    } else {
-      setView('sForm');
-    }
-  }, [me]);
-
-  const saveTeacher = useCallback((profile) => {
-    const updated = { ...profile, id: 99, rating: 5.0, levels: ['School', 'O/A-Level', 'University'] };
-    setMe(updated);
-    setTeachers(prev => [...prev.filter(t => t.id !== 99), updated]);
-    showToast('Profile saved. Students can now find you.');
-    setView('tDash');
-  }, [showToast]);
-
-  const sendRequest = useCallback((teacherId) => {
-    if (!query) return;
-    if (requests.find(r => r.tid === teacherId)) return;
-    setRequests(prev => [...prev, {
-      id: Date.now(),
-      tid: teacherId,
-      sname: query.name,
-      subject: query.subject,
-      level: query.level,
-      mode: query.mode,
-      budget: query.budget,
-      status: 'pending'
-    }]);
-    setModalTeacher(null);
-    showToast('Request sent! The teacher has been notified.');
-  }, [query, requests, showToast]);
-
-  const respondRequest = useCallback((reqId, status) => {
-    setRequests(prev => prev.map(r => r.id === reqId ? { ...r, status } : r));
-    showToast('Student notified: ' + status);
-  }, [showToast]);
-
-  const pendingCount = me ? requests.filter(r => r.tid === me.id && r.status === 'pending').length : 0;
+  const toast = useCallback((msg, type = 'default') => {
+    const id = ++toastId.current;
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2500);
+  }, []);
 
   return (
-    <AppContext.Provider value={{
-      view, go, role, pickRole,
-      me, saveTeacher,
-      query, setQuery,
-      requests, sendRequest, respondRequest,
-      teachers,
-      toast, showToast,
-      modalTeacher, setModalTeacher,
-      pendingCount,
-      theme, setTheme,
-    }}>
+    <AppContext.Provider value={{ page, navigate, user, login, logout, toast, toasts }}>
       {children}
     </AppContext.Provider>
   );
 }
 
-export function useApp() {
-  return useContext(AppContext);
-}
+export function useApp() { return useContext(AppContext); }
